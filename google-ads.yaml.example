@@ -1,0 +1,10 @@
+# Copie para google-ads.yaml e preencha. google-ads.yaml está no .gitignore.
+# client_id e client_secret vêm do client_secrets.json (OAuth desktop).
+# refresh_token é gerado por etl/gerar_refresh_token.py.
+
+developer_token: "SEU_DEVELOPER_TOKEN"
+client_id: "741043805839-ujv12kmhjhiojl7e9h9mjrk65qbulndr.apps.googleusercontent.com"
+client_secret: "SEU_CLIENT_SECRET"
+refresh_token: "SEU_REFRESH_TOKEN"
+login_customer_id: "1234567890"   # MCC, sem traços
+use_proto_plus: true

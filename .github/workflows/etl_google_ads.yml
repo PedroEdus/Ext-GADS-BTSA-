@@ -1,0 +1,34 @@
+name: ETL — google_ads
+
+on:
+  schedule:
+    - cron: "0 9 * * *"   # diário às 09:00 UTC (06:00 BRT) — extrai D-1
+  workflow_dispatch:        # disparo manual pela UI do GitHub
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Escrever credenciais GCP
+        run: |
+          mkdir -p keys
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 -d > keys/sa.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=keys/sa.json" >> $GITHUB_ENV
+
+      - name: Escrever google-ads.yaml
+        run: echo "${{ secrets.GOOGLE_ADS_YAML }}" | base64 -d > google-ads.yaml
+
+      - name: Rodar ETL (incremental D-1)
+        env:
+          GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
+        run: python etl/load_google_ads.py

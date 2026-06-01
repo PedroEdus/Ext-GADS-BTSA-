@@ -1,0 +1,9 @@
+google-ads
+google-cloud-bigquery
+google-auth
+google-auth-oauthlib
+pandas
+streamlit
+plotly
+python-dotenv
+pyarrow

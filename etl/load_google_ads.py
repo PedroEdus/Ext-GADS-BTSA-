@@ -1,25 +1,30 @@
-"""ETL Google Ads -> BigQuery (RAW).
+"""ETL Google Ads -> BigQuery (RAW) — multi-conta.
+
+Itera sobre todas as contas-folha listadas em contas.json
+(gerado por etl/descobrir_contas.py).
 
 Modos:
     # Incremental D-1 (padrão, usado pelo GitHub Action diário):
     python etl/load_google_ads.py
 
     # Carga histórica de um intervalo:
-    python etl/load_google_ads.py --inicio 2025-01-01 --fim 2025-06-01
+    python etl/load_google_ads.py --inicio 2025-01-01 --fim 2026-06-01
 
-Segue as regras da stack Buriti:
+Regras da stack Buriti:
 - WRITE_APPEND no RAW, dedup fica na query (ROW_NUMBER), nunca no ETL
 - _loaded_at timestamp em todo load
 - registra cada carga em controle_cargas_google_ads
 """
 
 import argparse
+import json
 import os
 from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 from dotenv import load_dotenv
 from google.ads.googleads.client import GoogleAdsClient
+from google.ads.googleads.errors import GoogleAdsException
 from google.cloud import bigquery
 
 load_dotenv()
@@ -30,13 +35,15 @@ DATASET_SILV = "buriti_marketing_silver"
 TABLE_RAW    = f"{PROJECT_ID}.{DATASET_RAW}.google_ads_raw"
 TABLE_AUDIT  = f"{PROJECT_ID}.{DATASET_SILV}.controle_cargas_google_ads"
 
-CUSTOMER_ID  = os.getenv("GOOGLE_ADS_CUSTOMER_ID", "").replace("-", "")
+ARQUIVO_CONTAS = "contas.json"
+API_VERSION = "v20"
 
 # Métricas diárias por campanha. Ajuste as colunas conforme a necessidade.
 GAQL = """
     SELECT
         segments.date,
         customer.id,
+        customer.descriptive_name,
         campaign.id,
         campaign.name,
         campaign.status,
@@ -52,14 +59,22 @@ GAQL = """
 
 
 def _ads_client() -> GoogleAdsClient:
-    return GoogleAdsClient.load_from_storage("google-ads.yaml", version="v18")
+    return GoogleAdsClient.load_from_storage("google-ads.yaml", version=API_VERSION)
 
 
-def extrair(inicio: str, fim: str) -> pd.DataFrame:
-    client = _ads_client()
+def _carregar_contas() -> list[dict]:
+    if not os.path.exists(ARQUIVO_CONTAS):
+        raise FileNotFoundError(
+            f"{ARQUIVO_CONTAS} não encontrado. Rode primeiro: python etl/descobrir_contas.py"
+        )
+    with open(ARQUIVO_CONTAS, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def extrair_conta(client: GoogleAdsClient, customer_id: str, inicio: str, fim: str) -> list[dict]:
     ga_service = client.get_service("GoogleAdsService")
     query = GAQL.format(inicio=inicio, fim=fim)
-    stream = ga_service.search_stream(customer_id=CUSTOMER_ID, query=query)
+    stream = ga_service.search_stream(customer_id=customer_id, query=query)
 
     linhas = []
     for batch in stream:
@@ -67,6 +82,7 @@ def extrair(inicio: str, fim: str) -> pd.DataFrame:
             linhas.append({
                 "date":                     r.segments.date,
                 "customer_id":              r.customer.id,
+                "customer_name":            r.customer.descriptive_name,
                 "campaign_id":              r.campaign.id,
                 "campaign_name":            r.campaign.name,
                 "campaign_status":          r.campaign.status.name,
@@ -77,7 +93,22 @@ def extrair(inicio: str, fim: str) -> pd.DataFrame:
                 "conversions":              r.metrics.conversions,
                 "conversions_value":        r.metrics.conversions_value,
             })
-    return pd.DataFrame(linhas)
+    return linhas
+
+
+def extrair(inicio: str, fim: str) -> pd.DataFrame:
+    client = _ads_client()
+    contas = _carregar_contas()
+    todas = []
+    for c in contas:
+        cid = c["id"]
+        try:
+            linhas = extrair_conta(client, cid, inicio, fim)
+            todas.extend(linhas)
+            print(f"   [{cid}] {c.get('nome', '')}: {len(linhas)} linhas")
+        except GoogleAdsException as ex:
+            print(f"   [{cid}] {c.get('nome', '')}: ERRO — {ex.failure.errors[0].message}")
+    return pd.DataFrame(todas)
 
 
 def carregar_raw(df: pd.DataFrame, client: bigquery.Client) -> int:
@@ -115,10 +146,11 @@ def main() -> None:
 
     client = bigquery.Client(project=PROJECT_ID)
     try:
+        print(f"Extraindo período {inicio} a {fim}:")
         df = extrair(inicio, fim)
         rows = carregar_raw(df, client)
         registrar_carga(client, rows, "OK", inicio, fim)
-        print(f"[OK] {rows} linhas carregadas em {TABLE_RAW} ({inicio} a {fim})")
+        print(f"\n[OK] {rows} linhas carregadas em {TABLE_RAW} ({inicio} a {fim})")
     except Exception as e:
         registrar_carga(client, 0, f"ERRO: {e}", inicio, fim)
         raise

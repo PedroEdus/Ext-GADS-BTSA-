@@ -18,9 +18,12 @@ load_dotenv()
 CUSTOMER_ID = os.getenv("GOOGLE_ADS_CUSTOMER_ID", "").replace("-", "")
 
 
+API_VERSION = "v20"
+
+
 def _client() -> GoogleAdsClient:
     # Carrega de google-ads.yaml na raiz do projeto.
-    return GoogleAdsClient.load_from_storage("google-ads.yaml", version="v18")
+    return GoogleAdsClient.load_from_storage("google-ads.yaml", version=API_VERSION)
 
 
 def listar_contas_acessiveis(client: GoogleAdsClient) -> None:
@@ -62,14 +65,14 @@ def main() -> None:
             testar_query(client, CUSTOMER_ID)
         else:
             print("\n[AVISO] GOOGLE_ADS_CUSTOMER_ID não definido no .env — pulei a query de teste.")
-        print("\n✅ Autenticação validada com sucesso.")
+        print("\n[OK] Autenticacao validada com sucesso.")
     except GoogleAdsException as ex:
-        print(f"\n❌ GoogleAdsException (request_id={ex.request_id}):")
+        print(f"\n[ERRO] GoogleAdsException (request_id={ex.request_id}):")
         for err in ex.failure.errors:
             print(f"   - {err.error_code}: {err.message}")
         raise
     except Exception as ex:
-        print(f"\n❌ Erro: {ex}")
+        print(f"\n[ERRO] {ex}")
         raise
 
 

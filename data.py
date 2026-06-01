@@ -1,7 +1,10 @@
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
 from google.cloud import bigquery
 from google.oauth2 import service_account
+
+load_dotenv()  # carrega GOOGLE_APPLICATION_CREDENTIALS em execução local
 
 PROJECT_ID = "buriti-marketing-analytics"
 DATASET    = "buriti_marketing_silver"
@@ -26,7 +29,7 @@ def carregar_dados() -> pd.DataFrame:
         FROM (
             SELECT *,
                    ROW_NUMBER() OVER (
-                       PARTITION BY date, campaign_id
+                       PARTITION BY date, customer_id, campaign_id
                        ORDER BY _loaded_at DESC
                    ) AS rn
             FROM `{PROJECT_ID}.{DATASET}.{TABELA}`

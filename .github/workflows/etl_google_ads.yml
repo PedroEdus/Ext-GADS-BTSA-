@@ -28,7 +28,8 @@ jobs:
       - name: Escrever google-ads.yaml
         run: echo "${{ secrets.GOOGLE_ADS_YAML }}" | base64 -d > google-ads.yaml
 
+      - name: Descobrir contas (gera contas.json)
+        run: python etl/descobrir_contas.py
+
       - name: Rodar ETL (incremental D-1)
-        env:
-          GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
         run: python etl/load_google_ads.py

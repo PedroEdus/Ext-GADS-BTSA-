@@ -14,6 +14,15 @@ TABELA     = "google_ads"
 
 _NUM_COLS = ["impressions", "clicks", "cost", "conversions", "conversions_value"]
 
+_UF_BR = {
+    "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA",
+    "MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN",
+    "RS","RO","RR","SC","SP","SE","TO",
+}
+
+# Ancora em Cidade/UF: nome pode ter acento, espaço, ponto
+_RE_CUF = re.compile(r'([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\.]+?)\s*/\s*([A-Z]{2})(?:\b|$)')
+
 
 def _tipo_lancamento(nome: str) -> str:
     """Classifica a campanha pelo nome: Estoque / Lançamento / Outros."""
@@ -23,6 +32,41 @@ def _tipo_lancamento(nome: str) -> str:
     if re.search(r"lan[cç]amento", n, re.IGNORECASE):
         return "Lançamento"
     return "Outros"
+
+
+def _extrair_cidade_uf(nome: str) -> tuple:
+    """Extrai (Cidade, UF) do nome da campanha usando 3 padrões.
+
+    Padrão 1 — Estoque | Cidade/UF  ou  Lançamento | Cidade/UF
+    Padrão 2 — Campanha de ... - Cidade/UF
+    Padrão 3 — Cidade/UF - ... (primeiro campo antes do traço)
+    Demais   — ("Não identificado", None)
+    """
+    n = str(nome).strip()
+
+    # Padrão 1
+    if re.match(r'^(?:Estoque|Lan[cç]amento)\s*\|', n, re.IGNORECASE):
+        apos = re.sub(r'^(?:Estoque|Lan[cç]amento)\s*\|\s*', '', n, flags=re.IGNORECASE)
+        m = _RE_CUF.match(apos)
+        if m and m.group(2) in _UF_BR:
+            return m.group(1).strip(), m.group(2)
+        return "Não identificado", None
+
+    # Padrão 2
+    if re.match(r'^Campanha\b', n, re.IGNORECASE):
+        partes = n.split(' - ', 1)
+        if len(partes) > 1:
+            m = _RE_CUF.match(partes[1].strip())
+            if m and m.group(2) in _UF_BR:
+                return m.group(1).strip(), m.group(2)
+        return "Não identificado", None
+
+    # Padrão 3
+    m = _RE_CUF.match(n)
+    if m and m.group(2) in _UF_BR:
+        return m.group(1).strip(), m.group(2)
+
+    return "Não identificado", None
 
 
 def _criar_client() -> bigquery.Client:
@@ -65,6 +109,12 @@ def carregar_dados() -> pd.DataFrame:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
-    # Classificação Estoque / Lançamento / Outros via regex no nome da campanha
+    # Classificação Estoque / Lançamento / Outros
     df["Tipo_Lancamento"] = df["campaign_name"].map(_tipo_lancamento)
+
+    # Extração de Cidade e UF via regex (3 padrões)
+    cidade_uf = df["campaign_name"].map(_extrair_cidade_uf)
+    df["Cidade"] = cidade_uf.map(lambda x: x[0])
+    df["UF"]     = cidade_uf.map(lambda x: x[1])
+
     return df

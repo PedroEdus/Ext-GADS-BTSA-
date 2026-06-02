@@ -37,6 +37,11 @@ contas = sorted(df["customer_name"].dropna().unique())
 sel_conta = st.sidebar.multiselect("Conta (cidade)", contas, default=contas)
 df = df[df["customer_name"].isin(sel_conta)]
 
+ufs = sorted(df["UF"].dropna().unique())
+if ufs:
+    sel_uf = st.sidebar.multiselect("UF", ufs, default=ufs)
+    df = df[df["UF"].isin(sel_uf) | (df["UF"].isna())]
+
 if df.empty:
     st.warning("Nenhum dado para os filtros selecionados.")
     st.stop()

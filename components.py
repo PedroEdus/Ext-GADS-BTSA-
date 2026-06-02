@@ -144,6 +144,14 @@ section[data-testid="stSidebar"] input[type="date"] {
 /* ── Títulos ─────────────────────────────────────────────────────────── */
 h1, h2, h3, h4 { font-weight: 700 !important; letter-spacing: -0.005em !important; }
 
+/* ── Gráficos Plotly — cantos arredondados ───────────────────────────── */
+[data-testid="stPlotlyChart"] > div,
+[data-testid="stPlotlyChart"] .js-plotly-plot,
+[data-testid="stPlotlyChart"] .plotly {
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+
 /* ── Divisor ─────────────────────────────────────────────────────────── */
 hr { border-color: #2a2a2a !important; }
 

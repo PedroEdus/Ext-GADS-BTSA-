@@ -319,22 +319,25 @@ def grafico_evolucao(df: pd.DataFrame, coluna: str, key_suffix: str = "") -> Non
             textfont=dict(size=10, color="rgba(255,255,255,0.7)"),
             cliponaxis=False,
         )
-        fig.update_layout(
-            **_LAYOUT_BASE, height=400, bargap=0.28,
+        # Constrói layout sem conflito: sobrescreve xaxis/yaxis do _LAYOUT_BASE
+        layout_mensal = {**_LAYOUT_BASE, **dict(
+            height=400, bargap=0.28,
             xaxis=dict(title=None, type="category", gridcolor="#2a2a2a"),
             yaxis=dict(title=None, gridcolor="#2a2a2a", range=[0, y_max * 1.22]),
             title=_titulo_layout(titulo_full),
-        )
+        )}
+        fig.update_layout(**layout_mensal)
     else:
         fig = px.area(agg, x="periodo", y=coluna, color_discrete_sequence=[cor])
         fig.update_traces(
             line=dict(width=2, color=cor),
             fillcolor=_rgba(cor, 0.13),
         )
-        fig.update_layout(
-            **_LAYOUT_BASE, height=380,
+        layout_diario = {**_LAYOUT_BASE, **dict(
+            height=380,
             title=_titulo_layout(titulo_full),
-        )
+        )}
+        fig.update_layout(**layout_diario)
 
     st.plotly_chart(fig, use_container_width=True)
 

@@ -389,17 +389,7 @@ def grafico_tipo_lancamento(df: pd.DataFrame, coluna: str = "cost", titulo: str 
         hovertemplate="%{label}: %{value:,.0f} (%{percent})",
         domain=dict(x=[0, 0.62], y=[0, 1]),
     )
-    fig.update_layout(
-        plot_bgcolor="#1c1c1c", paper_bgcolor="#1c1c1c",
-        separators=",.", height=320,
-        margin=dict(l=10, r=10, t=50, b=10),
-        legend=dict(
-            orientation="v", x=0.65, y=0.5, xanchor="left", yanchor="middle",
-            font=dict(family="Manrope, sans-serif", size=12, color="rgba(255,255,255,0.8)"),
-        ),
-        font=dict(family="Manrope, sans-serif", color="#ffffff"),
-        title=_titulo_layout(titulo),
-    )
+    fig.update_layout(**{**_DONUT_LAYOUT, "title": _titulo_layout(titulo)})
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -480,12 +470,26 @@ _CHANNEL_LABELS = {
 
 _CHANNEL_COLORS = {
     "Pesquisa":         "#008140",
-    "Performance Max":  "#00b359",
-    "Display":          "#33aa77",
+    "Performance Max":  "#f0f0f0",   # branco/quase-branco — contraste claro
+    "Display":          "#888888",
     "Shopping":         "#66cc99",
     "Vídeo":            "#004d26",
-    "Smart":            "#888888",
+    "Smart":            "#555555",
 }
+
+# Dimensões compartilhadas dos donuts (garante alinhamento perfeito)
+_DONUT_H      = 320
+_DONUT_MARGIN = dict(l=10, r=10, t=50, b=10)
+_DONUT_LAYOUT = dict(
+    plot_bgcolor="#1c1c1c", paper_bgcolor="#1c1c1c",
+    separators=",.", height=_DONUT_H,
+    margin=_DONUT_MARGIN,
+    legend=dict(
+        orientation="v", x=0.65, y=0.5, xanchor="left", yanchor="middle",
+        font=dict(family="Manrope, sans-serif", size=12, color="rgba(255,255,255,0.8)"),
+    ),
+    font=dict(family="Manrope, sans-serif", color="#ffffff"),
+)
 
 
 def grafico_canal(df: pd.DataFrame, coluna: str = "cost", titulo: str | None = None) -> None:
@@ -520,17 +524,7 @@ def grafico_canal(df: pd.DataFrame, coluna: str = "cost", titulo: str | None = N
         hovertemplate="%{label}: %{value:,.0f} (%{percent})",
         domain=dict(x=[0, 0.62], y=[0, 1]),
     )
-    fig.update_layout(
-        plot_bgcolor="#1c1c1c", paper_bgcolor="#1c1c1c",
-        separators=",.", height=300,
-        margin=dict(l=10, r=10, t=50, b=10),
-        legend=dict(
-            orientation="v", x=0.65, y=0.5, xanchor="left", yanchor="middle",
-            font=dict(family="Manrope, sans-serif", size=12, color="rgba(255,255,255,0.8)"),
-        ),
-        font=dict(family="Manrope, sans-serif", color="#ffffff"),
-        title=_titulo_layout(titulo),
-    )
+    fig.update_layout(**{**_DONUT_LAYOUT, "title": _titulo_layout(titulo)})
     st.plotly_chart(fig, use_container_width=True)
 
 

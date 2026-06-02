@@ -162,17 +162,34 @@ _EVO_FMT = {
 }
 
 
-def grafico_evolucao(df: pd.DataFrame, coluna: str, granularidade: str = "Diário") -> None:
+def grafico_evolucao(df: pd.DataFrame, coluna: str, key_suffix: str = "") -> None:
     titulo, cor, _ = _EVO_FMT[coluna]
-    agg = _agg_periodo(df, granularidade)
+
+    # Toggle inline acima do gráfico
+    gran = st.radio(
+        "Visualização",
+        ["Diário", "Mensal"],
+        horizontal=True,
+        key=f"gran_{coluna}_{key_suffix}",
+        label_visibility="collapsed",
+    )
+
+    agg = _agg_periodo(df, gran)
     if agg.empty:
         st.info("Sem dados no período.")
         return
-    sufixo = "(mês)" if granularidade == "Mensal" else "(dia)"
-    fig = px.area(agg, x="periodo", y=coluna, title=f"{titulo} {sufixo}",
-                  color_discrete_sequence=[cor])
-    fig.update_traces(line=dict(width=2), fillcolor=_rgba(cor, 0.13),
-                      mode="lines+markers" if granularidade == "Mensal" else "lines")
+
+    sufixo = "(mês)" if gran == "Mensal" else "(dia)"
+
+    if gran == "Mensal":
+        fig = px.bar(agg, x="periodo", y=coluna, title=f"{titulo} {sufixo}",
+                     color_discrete_sequence=[cor])
+        fig.update_traces(marker_color=cor)
+    else:
+        fig = px.area(agg, x="periodo", y=coluna, title=f"{titulo} {sufixo}",
+                      color_discrete_sequence=[cor])
+        fig.update_traces(line=dict(width=2), fillcolor=_rgba(cor, 0.13))
+
     fig.update_layout(
         template=_tema(), separators=",.", height=380,
         margin=dict(l=20, r=30, t=50, b=20),

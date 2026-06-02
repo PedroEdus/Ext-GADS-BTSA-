@@ -528,6 +528,56 @@ def grafico_canal(df: pd.DataFrame, coluna: str = "cost", titulo: str | None = N
     st.plotly_chart(fig, use_container_width=True)
 
 
+# ── CPC agrupado (barras horizontais pub-card) ────────────────────────────────
+
+def grafico_cpc_grupo(df: pd.DataFrame, coluna_grupo: str, titulo: str,
+                      color_map: dict | None = None) -> None:
+    """Barra horizontal de CPC médio agrupado por coluna_grupo."""
+    if coluna_grupo not in df.columns:
+        return
+    agg = df.groupby(coluna_grupo, as_index=False).agg(
+        cost=("cost", "sum"), clicks=("clicks", "sum")
+    )
+    agg["cpc"] = (agg["cost"] / agg["clicks"].replace(0, float("nan"))).fillna(0)
+    agg = agg[agg["cpc"] > 0].sort_values("cpc", ascending=False)
+    if agg.empty:
+        return
+
+    # rótulo legível
+    if coluna_grupo == "advertising_channel_type":
+        agg["_label"] = agg[coluna_grupo].map(
+            lambda x: _CHANNEL_LABELS.get(str(x), str(x))
+        )
+        agg["_color"] = agg["_label"].map(lambda x: _CHANNEL_COLORS.get(x, "#888888"))
+    else:
+        agg["_label"] = agg[coluna_grupo]
+        agg["_color"] = agg[coluna_grupo].map(
+            lambda x: (color_map or _LANCAMENTO_COLOR_MAP).get(x, "#888888")
+        )
+
+    max_val = agg["cpc"].max() or 1
+    rows_html = ""
+    for _, row in agg.iterrows():
+        bar_w = row["cpc"] / max_val * 100
+        val   = _br(row["cpc"], 2, "R$ ")
+        name  = str(row["_label"])
+        rows_html += (
+            f'<div class="pub-bar-row">'
+            f'<div class="pub-bar-name" title="{name}">{name}</div>'
+            f'<div class="pub-bar-track">'
+            f'<div class="pub-bar-fill" style="width:{bar_w:.2f}%;background:{row["_color"]};"></div>'
+            f'</div>'
+            f'<div class="pub-bar-value">{val}</div>'
+            f'</div>'
+        )
+    _html(f"""
+        <div class="pub-card">
+            <div class="pub-card-title">{titulo}</div>
+            <div class="pub-bar-list">{rows_html}</div>
+        </div>
+    """)
+
+
 # ── Tabela resumo por conta (cidade) ──────────────────────────────────────────
 def tabela_resumo(df: pd.DataFrame) -> None:
     grupo = "customer_name" if "customer_name" in df.columns else "campaign_name"

@@ -3,7 +3,8 @@ import streamlit as st
 
 from components import (
     exibir_logo, injetar_css_global, kpis, grafico_evolucao,
-    grafico_tipo_lancamento, grafico_canal, grafico_barras_campanha, tabela_resumo,
+    grafico_tipo_lancamento, grafico_canal, grafico_cpc_grupo,
+    grafico_barras_campanha, tabela_resumo,
 )
 from data import carregar_dados
 
@@ -92,6 +93,11 @@ with aba_cliques:
 
 with aba_cpc:
     grafico_evolucao(df, "cpc")
+    c1, c2 = st.columns(2)
+    with c1:
+        grafico_cpc_grupo(df, "Tipo_Lancamento", "CPC médio por tipo")
+    with c2:
+        grafico_cpc_grupo(df, "advertising_channel_type", "CPC médio por canal")
     grafico_barras_campanha(df, "cpc", "Custo por clique por campanha (R$)", "bar_cpc")
 
 with aba_tabela:

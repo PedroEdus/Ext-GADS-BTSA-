@@ -66,6 +66,11 @@ def _extrair_cidade_uf(nome: str) -> tuple:
     if m and m.group(2) in _UF_BR:
         return m.group(1).strip(), m.group(2)
 
+    # Padrão 4 (catch-all) — varre o nome inteiro buscando qualquer Cidade/UF
+    m = _RE_CUF.search(n)
+    if m and m.group(2) in _UF_BR:
+        return m.group(1).strip(), m.group(2)
+
     return "Não identificado", None
 
 

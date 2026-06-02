@@ -1,21 +1,20 @@
 """Extração massiva Google Ads -> BigQuery, com SAVEPOINTS + THREADS.
 
-Inspirado no padrão do GA4 (Extração Massiva Analytics.py), mas com chunk
-MENSAL em vez de diário — a Google Ads API tem limite diário de operações
-rígido, e dia-a-dia (26 contas x ~516 dias) estoura a quota. Mês-a-mês a
-API retorna as linhas diárias numa única query (~17 chunks x 26 contas).
+IMPORTANTE: a Google Ads API tem teto diário de operações baixo. Fatiar
+por dia/mês multiplica chamadas e estoura a quota. Aqui usamos UMA query
+`segments.date BETWEEN inicio AND fim` por conta (a API já devolve as
+linhas diárias) — apenas N_contas chamadas no total.
 
 - 1 checkpoint CSV por conta em gads_checkpoints/{cid}.csv  (dados)
-- 1 controle de chunks por conta em gads_checkpoints/{cid}.done.json (savepoint)
-- retoma de onde parou (pula meses já extraídos, inclusive os vazios)
+- savepoint POR CONTA: conta concluída fica marcada e não é refeita
 - ThreadPoolExecutor paraleliza entre as contas
 - retry com backoff em rate limit / erros transitórios
 - ao fim: merge dos checkpoints -> RAW (WRITE_TRUNCATE) + registro da carga
 
     python etl/extracao_massiva.py
-    python etl/extracao_massiva.py --inicio 2025-01-01 --fim 2026-05-31 --workers 3
-    python etl/extracao_massiva.py --sem-bq        # só extrai p/ CSV, não carrega no BQ
-    python etl/extracao_massiva.py --reset         # apaga checkpoints e recomeça
+    python etl/extracao_massiva.py --inicio 2025-01-01 --fim 2026-05-31 --workers 4
+    python etl/extracao_massiva.py --sem-bq     # só extrai p/ CSV, não carrega no BQ
+    python etl/extracao_massiva.py --reset      # apaga checkpoints e recomeça
 """
 
 import argparse
@@ -72,64 +71,39 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 
 # ============================================================
-# CHUNKS MENSAIS
-# ============================================================
-def meses(inicio: str, fim: str) -> list[tuple[str, str, str]]:
-    """Lista (chave 'YYYY-MM', primeiro_dia, ultimo_dia) cobrindo [inicio, fim]."""
-    di = datetime.strptime(inicio, "%Y-%m-%d").date()
-    df_ = datetime.strptime(fim, "%Y-%m-%d").date()
-    out = []
-    cur = di.replace(day=1)
-    while cur <= df_:
-        prox = (cur.replace(day=28) + timedelta(days=4)).replace(day=1)
-        ini_chunk = max(cur, di)
-        fim_chunk = min(prox - timedelta(days=1), df_)
-        out.append((cur.strftime("%Y-%m"), ini_chunk.isoformat(), fim_chunk.isoformat()))
-        cur = prox
-    return out
-
-
-# ============================================================
-# SAVEPOINT HELPERS (por conta)
+# SAVEPOINT POR CONTA
 # ============================================================
 def csv_path(cid: str) -> str:
     return os.path.join(CHECKPOINT_DIR, f"{cid}.csv")
 
 
 def done_path(cid: str) -> str:
-    return os.path.join(CHECKPOINT_DIR, f"{cid}.done.json")
+    return os.path.join(CHECKPOINT_DIR, f"{cid}.done")
 
 
-def load_done_chunks(cid: str) -> set:
-    p = done_path(cid)
-    if os.path.exists(p):
-        return set(json.load(open(p, encoding="utf-8")))
-    return set()
+def conta_concluida(cid: str) -> bool:
+    return os.path.exists(done_path(cid))
 
 
-def mark_chunk_done(cid: str, chunk_key: str) -> None:
-    done = load_done_chunks(cid)
-    done.add(chunk_key)
-    json.dump(sorted(done), open(done_path(cid), "w", encoding="utf-8"))
+def marcar_concluida(cid: str) -> None:
+    open(done_path(cid), "w").write(datetime.now(timezone.utc).isoformat())
 
 
-def append_csv(cid: str, df_new: pd.DataFrame) -> None:
-    p = csv_path(cid)
-    if os.path.exists(p):
-        df_old = pd.read_csv(p, dtype=str)
-        df_all = pd.concat([df_old, df_new.astype(str)], ignore_index=True)
-        df_all = df_all.drop_duplicates(subset=DEDUP_KEYS, keep="last")
-    else:
-        df_all = df_new.astype(str)
-    df_all.to_csv(p, index=False, encoding="utf-8")
+def salvar_csv(cid: str, df: pd.DataFrame) -> None:
+    df.astype(str).to_csv(csv_path(cid), index=False, encoding="utf-8")
 
 
 # ============================================================
-# EXTRAÇÃO (1 chunk mensal, com retry)
+# EXTRAÇÃO (1 conta = 1 query no range inteiro, com retry)
 # ============================================================
-def extrair_chunk(client, cid, ini, fim, retries=6) -> pd.DataFrame:
+def extrair_conta(cid: str, nome: str, inicio: str, fim: str, retries: int = 6) -> int:
+    if conta_concluida(cid):
+        return -1  # já feita (savepoint)
+
+    client = GoogleAdsClient.load_from_storage("google-ads.yaml", version=API_VERSION)
     ga = client.get_service("GoogleAdsService")
-    query = GAQL.format(inicio=ini, fim=fim)
+    query = GAQL.format(inicio=inicio, fim=fim)
+
     for attempt in range(retries):
         try:
             stream = ga.search_stream(customer_id=cid, query=query)
@@ -150,37 +124,21 @@ def extrair_chunk(client, cid, ini, fim, retries=6) -> pd.DataFrame:
                         "conversions":              r.metrics.conversions,
                         "conversions_value":        r.metrics.conversions_value,
                     })
-            return pd.DataFrame(linhas)
+            df = pd.DataFrame(linhas)
+            if not df.empty:
+                salvar_csv(cid, df)
+            marcar_concluida(cid)   # savepoint da conta (mesmo se vazia)
+            return len(df)
         except GoogleAdsException as ex:
             msg = ex.failure.errors[0].message if ex.failure.errors else str(ex)
             up = msg.upper()
             transitorio = any(k in up for k in ("EXHAUST", "QUOTA", "INTERNAL", "DEADLINE", "UNAVAILABLE"))
             if transitorio and attempt < retries - 1:
-                wait = min(60, 15 * (attempt + 1))
-                print(f"    [retry {attempt+1}/{retries}] {cid} {ini[:7]} — {wait}s ({msg[:40]})")
+                wait = min(120, 20 * (attempt + 1))
+                print(f"    [retry {attempt+1}/{retries}] {cid} — {wait}s ({msg[:40]})")
                 time.sleep(wait)
             else:
                 raise
-
-
-def extrair_conta(cid: str, nome: str, chunks: list[tuple[str, str, str]]) -> int:
-    """Processa todos os chunks pendentes de uma conta. Roda em uma thread."""
-    client = GoogleAdsClient.load_from_storage("google-ads.yaml", version=API_VERSION)
-    done = load_done_chunks(cid)
-    novos = 0
-    for chave, ini, fim in chunks:
-        if chave in done:
-            continue
-        try:
-            df = extrair_chunk(client, cid, ini, fim)
-            if df is not None and not df.empty:
-                append_csv(cid, df)
-                novos += len(df)
-            mark_chunk_done(cid, chave)   # savepoint (mesmo se vazio)
-        except Exception as e:
-            print(f"  [{cid}] ERRO {chave} — {str(e)[:80]}")
-        time.sleep(0.2)
-    return novos
 
 
 # ============================================================
@@ -193,7 +151,9 @@ def merge_csvs() -> pd.DataFrame:
             df = pd.read_csv(os.path.join(CHECKPOINT_DIR, f), dtype=str)
             if not df.empty:
                 frames.append(df)
-    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True).drop_duplicates(subset=DEDUP_KEYS, keep="last")
 
 
 def _tipar(df: pd.DataFrame) -> pd.DataFrame:
@@ -229,7 +189,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--inicio", default="2025-01-01")
     parser.add_argument("--fim", default=(date.today() - timedelta(days=1)).isoformat())
-    parser.add_argument("--workers", type=int, default=3)
+    parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--sem-bq", action="store_true")
     parser.add_argument("--reset", action="store_true")
     args = parser.parse_args()
@@ -240,24 +200,24 @@ def main() -> None:
         print("[reset] checkpoints apagados.\n")
 
     contas = json.load(open(ARQUIVO_CONTAS, encoding="utf-8"))
-    chunks = meses(args.inicio, args.fim)
     print(f"Contas: {len(contas)} | Período: {args.inicio} -> {args.fim} | "
-          f"Chunks/conta: {len(chunks)} (mensal) | Workers: {args.workers}\n")
+          f"1 chamada/conta | Workers: {args.workers}\n")
 
     completed = 0
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {
-            executor.submit(extrair_conta, c["id"], c.get("nome", ""), chunks): c
+            executor.submit(extrair_conta, c["id"], c.get("nome", ""), args.inicio, args.fim): c
             for c in contas
         }
         for fut in as_completed(futures):
             c = futures[fut]
             try:
-                novos = fut.result()
+                n = fut.result()
                 completed += 1
-                print(f"[{completed}/{len(contas)}] {c['id']} {c.get('nome','')} — {novos} linhas novas")
+                status = "já feita" if n == -1 else f"{n} linhas"
+                print(f"[{completed}/{len(contas)}] {c['id']} {c.get('nome','')} — {status}")
             except Exception as e:
-                print(f"[ERRO FATAL] {c['id']} — {str(e)[:80]}")
+                print(f"[ERRO] {c['id']} {c.get('nome','')} — {str(e)[:80]}")
 
     print("\nMergindo checkpoints...")
     df = merge_csvs()

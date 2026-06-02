@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -9,6 +11,18 @@ load_dotenv()  # carrega GOOGLE_APPLICATION_CREDENTIALS em execução local
 PROJECT_ID = "buriti-marketing-analytics"
 DATASET    = "buriti_marketing_silver"
 TABELA     = "google_ads"
+
+_NUM_COLS = ["impressions", "clicks", "cost", "conversions", "conversions_value"]
+
+
+def _tipo_lancamento(nome: str) -> str:
+    """Classifica a campanha pelo nome: Estoque / Lançamento / Outros."""
+    n = str(nome)
+    if re.search(r"estoque", n, re.IGNORECASE):
+        return "Estoque"
+    if re.search(r"lan[cç]amento", n, re.IGNORECASE):
+        return "Lançamento"
+    return "Outros"
 
 
 def _criar_client() -> bigquery.Client:
@@ -42,4 +56,15 @@ def carregar_dados() -> pd.DataFrame:
         )
         WHERE rn = 1
     """
-    return client.query(query).to_dataframe()
+    df = client.query(query).to_dataframe()
+    if df.empty:
+        return df
+
+    df["date"] = pd.to_datetime(df["date"])
+    for c in _NUM_COLS:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+
+    # Classificação Estoque / Lançamento / Outros via regex no nome da campanha
+    df["Tipo_Lancamento"] = df["campaign_name"].map(_tipo_lancamento)
+    return df

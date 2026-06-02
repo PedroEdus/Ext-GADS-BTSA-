@@ -152,9 +152,37 @@ def extrair(inicio: str, fim: str) -> pd.DataFrame:
     return pd.DataFrame(todas)
 
 
-def carregar_raw(df: pd.DataFrame, client: bigquery.Client) -> int:
+def _apagar_periodo(client: bigquery.Client, inicio: str, fim: str) -> None:
+    """Remove do RAW as linhas do período antes de reinserir (idempotência).
+
+    Garante que reprocessar o mesmo intervalo não gere duplicatas e que
+    métricas que consolidam retroativamente sejam substituídas pelas mais
+    recentes. Ignora silenciosamente se a tabela ainda não existe.
+    """
+    try:
+        query = f"""
+            DELETE FROM `{TABLE_RAW}`
+            WHERE date BETWEEN @inicio AND @fim
+        """
+        job_config = bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("inicio", "STRING", inicio),
+            bigquery.ScalarQueryParameter("fim", "STRING", fim),
+        ])
+        job = client.query(query, job_config=job_config)
+        job.result()
+        removidas = job.num_dml_affected_rows or 0
+        if removidas:
+            print(f"[dedup] {removidas} linhas antigas de {inicio} a {fim} removidas antes do append.")
+    except Exception as e:
+        # Tabela inexistente na primeira carga -> nada a apagar.
+        print(f"[dedup] sem remoção prévia ({str(e)[:60]}).")
+
+
+def carregar_raw(df: pd.DataFrame, client: bigquery.Client, inicio: str, fim: str) -> int:
     if df.empty:
         return 0
+    # Idempotência: apaga o período antes de reinserir (anti-duplicatas).
+    _apagar_periodo(client, inicio, fim)
     df["_loaded_at"] = datetime.now(timezone.utc)
     job_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND")
     client.load_table_from_dataframe(df, TABLE_RAW, job_config=job_config).result()
@@ -197,7 +225,7 @@ def main() -> None:
     try:
         print(f"Extraindo período {inicio} a {fim}:")
         df = extrair(inicio, fim)
-        rows = carregar_raw(df, client)
+        rows = carregar_raw(df, client, inicio, fim)
         registrar_carga(client, rows, "OK", inicio, fim)
         print(f"\n[OK] {rows} linhas carregadas em {TABLE_RAW} ({inicio} a {fim})")
     except Exception as e:

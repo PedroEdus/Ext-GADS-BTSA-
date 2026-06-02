@@ -10,11 +10,21 @@ _ASSETS     = os.path.join(os.path.dirname(__file__), "assets")
 LOGO_CLARA  = os.path.join(_ASSETS, "logo_preta.png")
 LOGO_ESCURA = os.path.join(_ASSETS, "logo_branca.png")
 
-# Estoque / Lançamento / Outros — paleta verde da marca (mesma do Meta Ads)
+# ── Paleta oficial Buriti ─────────────────────────────────────────────────────
+_PALETTE = [
+    "#008347",  # 1. verde principal
+    "#f0f0f0",  # 2. branco
+    "#888888",  # 3. cinza
+    "#006682",  # 4. azul-petróleo
+    "#008274",  # 5. teal-verde
+    "#5BD9CC",  # 6. teal claro
+    "#1E3436",  # 7. teal escuro
+]
+
 _LANCAMENTO_COLOR_MAP = {
-    "Lançamento": "#008140",   # verde — marca principal
-    "Estoque":    "#006682",   # azul-petróleo
-    "Outros":     "#888888",   # cinza
+    "Lançamento": _PALETTE[0],  # verde principal
+    "Estoque":    _PALETTE[3],  # azul-petróleo
+    "Outros":     _PALETTE[2],  # cinza
 }
 
 POR_PAGINA = 20
@@ -469,12 +479,12 @@ _CHANNEL_LABELS = {
 }
 
 _CHANNEL_COLORS = {
-    "Pesquisa":         "#008140",   # verde — marca principal
-    "Performance Max":  "#008274",   # teal-verde
-    "Display":          "#006682",   # azul-petróleo
-    "Shopping":         "#f0f0f0",   # branco
-    "Vídeo":            "#888888",   # cinza
-    "Smart":            "#555555",   # cinza escuro
+    "Pesquisa":         _PALETTE[0],  # verde principal
+    "Performance Max":  _PALETTE[4],  # teal-verde
+    "Display":          _PALETTE[3],  # azul-petróleo
+    "Shopping":         _PALETTE[5],  # teal claro
+    "Vídeo":            _PALETTE[6],  # teal escuro
+    "Smart":            _PALETTE[2],  # cinza
 }
 
 # Dimensões compartilhadas dos donuts (garante alinhamento perfeito)

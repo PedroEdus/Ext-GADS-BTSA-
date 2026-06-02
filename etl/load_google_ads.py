@@ -1,13 +1,17 @@
-"""ETL Google Ads -> BigQuery (RAW) — multi-conta.
+"""ETL Google Ads -> BigQuery (RAW) — multi-conta, incremental e responsivo.
 
-Itera sobre todas as contas-folha listadas em contas.json
-(gerado por etl/descobrir_contas.py).
+Antes de extrair, o script lê a última data já presente no BigQuery e só
+coleta o que falta até ontem (D-1):
+
+- Última data no BQ >= D-1  -> nada a fazer (dados já em dia).
+- Última data no BQ <  D-1  -> extrai de (última data + 1) até D-1.
+- Tabela vazia / inexistente -> faz a carga inicial a partir de INICIO_PADRAO.
 
 Modos:
-    # Incremental D-1 (padrão, usado pelo GitHub Action diário):
+    # Incremental automático (padrão, usado pelo GitHub Action diário):
     python etl/load_google_ads.py
 
-    # Carga histórica de um intervalo:
+    # Forçar um intervalo específico (sobrescreve a lógica incremental):
     python etl/load_google_ads.py --inicio 2025-01-01 --fim 2026-06-01
 
 Regras da stack Buriti:
@@ -36,6 +40,7 @@ TABLE_RAW    = f"{PROJECT_ID}.{DATASET_RAW}.google_ads_raw"
 TABLE_AUDIT  = f"{PROJECT_ID}.{DATASET_SILV}.controle_cargas_google_ads"
 
 ARQUIVO_CONTAS = "contas.json"
+INICIO_PADRAO  = "2025-01-01"   # usado só quando o RAW está vazio (carga inicial)
 
 # Métricas diárias por campanha. Ajuste as colunas conforme a necessidade.
 GAQL = """
@@ -95,6 +100,43 @@ def extrair_conta(client: GoogleAdsClient, customer_id: str, inicio: str, fim: s
     return linhas
 
 
+def ultima_data_bq(client: bigquery.Client) -> date | None:
+    """Lê a última (maior) data já presente no RAW. None se vazio/inexistente."""
+    try:
+        query = f"SELECT MAX(date) AS ultima FROM `{TABLE_RAW}`"
+        for row in client.query(query).result():
+            if row.ultima is None:
+                return None
+            # date pode vir como string ISO ('2026-05-31') ou date
+            if isinstance(row.ultima, str):
+                return datetime.strptime(row.ultima[:10], "%Y-%m-%d").date()
+            return row.ultima
+    except Exception as e:
+        print(f"[aviso] não foi possível ler a última data do BQ ({str(e)[:60]}). "
+              f"Tratando como carga inicial.")
+        return None
+
+
+def resolver_periodo(client: bigquery.Client) -> tuple[str, str] | None:
+    """Define [inicio, fim] incremental. Retorna None se já está em dia."""
+    d1 = date.today() - timedelta(days=1)
+    ultima = ultima_data_bq(client)
+
+    if ultima is None:
+        inicio = datetime.strptime(INICIO_PADRAO, "%Y-%m-%d").date()
+        print(f"[incremental] RAW vazio — carga inicial a partir de {inicio}.")
+    elif ultima >= d1:
+        print(f"[incremental] Dados já em dia (última data no BQ: {ultima}, D-1: {d1}). "
+              f"Nada a extrair.")
+        return None
+    else:
+        inicio = ultima + timedelta(days=1)
+        print(f"[incremental] Última data no BQ: {ultima} | D-1: {d1} | "
+              f"extraindo {inicio} -> {d1}.")
+
+    return inicio.isoformat(), d1.isoformat()
+
+
 def extrair(inicio: str, fim: str) -> pd.DataFrame:
     client = _ads_client()
     contas = _carregar_contas()
@@ -135,15 +177,23 @@ def registrar_carga(client: bigquery.Client, rows: int, status: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--inicio", help="YYYY-MM-DD (default: D-1)")
-    parser.add_argument("--fim", help="YYYY-MM-DD (default: D-1)")
+    parser.add_argument("--inicio", help="YYYY-MM-DD (sobrescreve a lógica incremental)")
+    parser.add_argument("--fim", help="YYYY-MM-DD (sobrescreve a lógica incremental)")
     args = parser.parse_args()
 
-    d1 = (date.today() - timedelta(days=1)).isoformat()
-    inicio = args.inicio or d1
-    fim = args.fim or d1
-
     client = bigquery.Client(project=PROJECT_ID)
+
+    # Intervalo manual tem prioridade; senão, resolve incrementalmente pelo BQ.
+    if args.inicio or args.fim:
+        d1 = (date.today() - timedelta(days=1)).isoformat()
+        inicio = args.inicio or d1
+        fim = args.fim or d1
+    else:
+        periodo = resolver_periodo(client)
+        if periodo is None:
+            return  # já está em dia, nada a fazer
+        inicio, fim = periodo
+
     try:
         print(f"Extraindo período {inicio} a {fim}:")
         df = extrair(inicio, fim)

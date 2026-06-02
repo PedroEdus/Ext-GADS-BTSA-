@@ -114,6 +114,9 @@ def carregar_dados() -> pd.DataFrame:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
+    # Remove campanhas de teste [TS]
+    df = df[~df["campaign_name"].str.match(r"^\[TS\]", na=False)]
+
     # Classificação Estoque / Lançamento / Outros
     df["Tipo_Lancamento"] = df["campaign_name"].map(_tipo_lancamento)
 

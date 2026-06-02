@@ -12,9 +12,9 @@ LOGO_ESCURA = os.path.join(_ASSETS, "logo_branca.png")
 
 # Estoque / Lançamento / Outros — paleta verde da marca (mesma do Meta Ads)
 _LANCAMENTO_COLOR_MAP = {
-    "Lançamento": "#008140",
-    "Estoque":    "#00b359",
-    "Outros":     "#888888",
+    "Lançamento": "#008140",   # verde — marca principal
+    "Estoque":    "#006682",   # azul-petróleo
+    "Outros":     "#888888",   # cinza
 }
 
 POR_PAGINA = 20
@@ -469,12 +469,12 @@ _CHANNEL_LABELS = {
 }
 
 _CHANNEL_COLORS = {
-    "Pesquisa":         "#008140",
-    "Performance Max":  "#f0f0f0",   # branco/quase-branco — contraste claro
-    "Display":          "#888888",
-    "Shopping":         "#66cc99",
-    "Vídeo":            "#004d26",
-    "Smart":            "#555555",
+    "Pesquisa":         "#008140",   # verde — marca principal
+    "Performance Max":  "#008274",   # teal-verde
+    "Display":          "#006682",   # azul-petróleo
+    "Shopping":         "#f0f0f0",   # branco
+    "Vídeo":            "#888888",   # cinza
+    "Smart":            "#555555",   # cinza escuro
 }
 
 # Dimensões compartilhadas dos donuts (garante alinhamento perfeito)

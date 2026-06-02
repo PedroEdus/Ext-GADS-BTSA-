@@ -12,10 +12,9 @@ __pycache__/
 .venv/
 venv/
 
-# Outputs gerados pelo ETL
+# Outputs gerados pelo ETL (dados já no BigQuery)
 contas.json
 gads_checkpoints/
-gads_out/
 *.csv
 
 # Logs

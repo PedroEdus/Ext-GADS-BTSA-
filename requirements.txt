@@ -1,5 +1,6 @@
 google-ads>=26.0.0
 google-cloud-bigquery
+db-dtypes
 google-auth
 google-auth-oauthlib
 pandas

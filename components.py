@@ -144,6 +144,19 @@ section[data-testid="stSidebar"] input[type="date"] {
 /* ── Títulos ─────────────────────────────────────────────────────────── */
 h1, h2, h3, h4 { font-weight: 700 !important; letter-spacing: -0.005em !important; }
 
+/* ── Radio button — cor neutra (branco/cinza) ────────────────────────── */
+[data-testid="stRadio"] label [data-testid="stMarkdownContainer"] p {
+    color: rgba(255,255,255,0.72) !important;
+}
+div[role="radiogroup"] div[data-baseweb="radio"] div:first-child {
+    border-color: rgba(255,255,255,0.4) !important;
+    background-color: transparent !important;
+}
+div[role="radiogroup"] div[data-baseweb="radio"] input:checked + div div:first-child {
+    border-color: rgba(255,255,255,0.9) !important;
+    background-color: rgba(255,255,255,0.9) !important;
+}
+
 /* ── Gráficos Plotly — cantos arredondados ───────────────────────────── */
 [data-testid="stPlotlyChart"] > div,
 [data-testid="stPlotlyChart"] .js-plotly-plot,

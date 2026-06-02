@@ -1,18 +1,35 @@
+# Credenciais e secrets
 .env
 keys/
-*.json
 google-ads.yaml
+client_secrets.json
 token.pkl
+*.json
+
+# Python
 __pycache__/
-.DS_Store
 *.pyc
 .venv/
 venv/
-streamlit.log
+
+# Outputs gerados pelo ETL
 contas.json
 gads_checkpoints/
 gads_out/
+*.csv
+
+# Logs
+streamlit.log
 massiva.log
 massiva_agendada.log
+
+# Scripts auxiliares
 run_massiva.bat
-*.csv
+generate_design_doc.js
+node_modules/
+package.json
+package-lock.json
+*.docx
+
+# OS
+.DS_Store

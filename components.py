@@ -46,6 +46,39 @@ _CSS = """
 </style>
 """
 
+# CSS global injetado uma vez no app — substitui vermelho do Streamlit por verde Buriti
+_GLOBAL_CSS = """
+<style>
+/* Tags do multiselect: fundo verde Buriti */
+span[data-baseweb="tag"] {
+    background-color: #008140 !important;
+}
+/* X de remoção da tag */
+span[data-baseweb="tag"] span[role="img"] svg path {
+    fill: rgba(255,255,255,0.8) !important;
+}
+/* Radio button selecionado: verde */
+input[type="radio"]:checked + div {
+    color: #008140 !important;
+}
+div[data-baseweb="radio"] input:checked ~ div:first-of-type div {
+    background-color: #008140 !important;
+    border-color: #008140 !important;
+}
+/* Tabs sublinhado ativo: verde */
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #008140 !important;
+}
+button[data-baseweb="tab"][aria-selected="true"]::after {
+    background-color: #008140 !important;
+}
+</style>
+"""
+
+
+def injetar_css_global() -> None:
+    st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
+
 
 def _html(content: str) -> None:
     if hasattr(st, "html"):
@@ -162,16 +195,28 @@ _EVO_FMT = {
 }
 
 
-def grafico_evolucao(df: pd.DataFrame, coluna: str, key_suffix: str = "") -> None:
-    titulo, cor, _ = _EVO_FMT[coluna]
+_LAYOUT_BASE = dict(
+    plot_bgcolor="#1c1c1c",
+    paper_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="Manrope, sans-serif", color="#ffffff"),
+    margin=dict(l=20, r=20, t=50, b=20),
+    xaxis=dict(title=None, gridcolor="#2a2a2a", linecolor="#2a2a2a"),
+    yaxis=dict(title=None, gridcolor="#2a2a2a"),
+    separators=",.",
+)
 
-    # Toggle inline acima do gráfico
+
+def _titulo_layout(titulo: str) -> dict:
+    return dict(font=dict(family="Manrope, sans-serif", size=15, color="#ffffff"),
+                x=0, xanchor="left", pad=dict(l=4), text=titulo)
+
+
+def grafico_evolucao(df: pd.DataFrame, coluna: str, key_suffix: str = "") -> None:
+    titulo, cor, fmt = _EVO_FMT[coluna]
+
     gran = st.radio(
-        "Visualização",
-        ["Diário", "Mensal"],
-        horizontal=True,
-        key=f"gran_{coluna}_{key_suffix}",
-        label_visibility="collapsed",
+        "Visualização", ["Diário", "Mensal"], horizontal=True,
+        key=f"gran_{coluna}_{key_suffix}", label_visibility="collapsed",
     )
 
     agg = _agg_periodo(df, gran)
@@ -180,22 +225,38 @@ def grafico_evolucao(df: pd.DataFrame, coluna: str, key_suffix: str = "") -> Non
         return
 
     sufixo = "(mês)" if gran == "Mensal" else "(dia)"
+    titulo_full = f"{titulo} {sufixo}"
 
     if gran == "Mensal":
-        fig = px.bar(agg, x="periodo", y=coluna, title=f"{titulo} {sufixo}",
-                     color_discrete_sequence=[cor])
-        fig.update_traces(marker_color=cor)
+        agg_plot = agg.copy()
+        agg_plot["periodo_str"] = agg_plot["periodo"].dt.strftime("%b/%Y")
+        y_max = float(agg_plot[coluna].max()) if not agg_plot.empty else 1
+        fig = px.bar(agg_plot, x="periodo_str", y=coluna)
+        text_br = [fmt(v) for v in agg_plot[coluna]]
+        fig.update_traces(
+            marker_color=cor,
+            text=text_br, texttemplate="%{text}",
+            textposition="outside",
+            textfont=dict(size=10, color="rgba(255,255,255,0.7)"),
+            cliponaxis=False,
+        )
+        fig.update_layout(
+            **_LAYOUT_BASE, height=400, bargap=0.28,
+            xaxis=dict(title=None, type="category", gridcolor="#2a2a2a"),
+            yaxis=dict(title=None, gridcolor="#2a2a2a", range=[0, y_max * 1.22]),
+            title=_titulo_layout(titulo_full),
+        )
     else:
-        fig = px.area(agg, x="periodo", y=coluna, title=f"{titulo} {sufixo}",
-                      color_discrete_sequence=[cor])
-        fig.update_traces(line=dict(width=2), fillcolor=_rgba(cor, 0.13))
+        fig = px.area(agg, x="periodo", y=coluna, color_discrete_sequence=[cor])
+        fig.update_traces(
+            line=dict(width=2, color=cor),
+            fillcolor=_rgba(cor, 0.13),
+        )
+        fig.update_layout(
+            **_LAYOUT_BASE, height=380,
+            title=_titulo_layout(titulo_full),
+        )
 
-    fig.update_layout(
-        template=_tema(), separators=",.", height=380,
-        margin=dict(l=20, r=30, t=50, b=20),
-        xaxis_title=None, yaxis_title=None,
-        title=dict(font=dict(size=14, color="#fff")),
-    )
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -225,11 +286,15 @@ def grafico_tipo_lancamento(df: pd.DataFrame, coluna: str = "cost", titulo: str 
         domain=dict(x=[0, 0.62], y=[0, 1]),
     )
     fig.update_layout(
-        template=_tema(), separators=",.", height=320,
+        plot_bgcolor="#1c1c1c", paper_bgcolor="rgba(0,0,0,0)",
+        separators=",.", height=320,
         margin=dict(l=10, r=10, t=50, b=10),
-        legend=dict(orientation="v", x=0.65, y=0.5, xanchor="left", yanchor="middle",
-                    font=dict(size=12, color="rgba(255,255,255,0.8)")),
-        title=dict(font=dict(size=14, color="#fff")),
+        legend=dict(
+            orientation="v", x=0.65, y=0.5, xanchor="left", yanchor="middle",
+            font=dict(family="Manrope, sans-serif", size=12, color="rgba(255,255,255,0.8)"),
+        ),
+        font=dict(family="Manrope, sans-serif", color="#ffffff"),
+        title=_titulo_layout(titulo),
     )
     st.plotly_chart(fig, use_container_width=True)
 

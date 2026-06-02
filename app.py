@@ -2,13 +2,14 @@ import pandas as pd
 import streamlit as st
 
 from components import (
-    exibir_logo, kpis, grafico_evolucao, grafico_tipo_lancamento,
-    grafico_barras_campanha, tabela_resumo,
+    exibir_logo, injetar_css_global, kpis, grafico_evolucao,
+    grafico_tipo_lancamento, grafico_barras_campanha, tabela_resumo,
 )
 from data import carregar_dados
 
 st.set_page_config(page_title="Google Ads — Buriti", page_icon="📊", layout="wide")
 
+injetar_css_global()
 exibir_logo()
 st.title("Google Ads — Buriti")
 

@@ -1,4 +1,4 @@
-google-ads
+google-ads>=25.0.0
 google-cloud-bigquery
 google-auth
 google-auth-oauthlib

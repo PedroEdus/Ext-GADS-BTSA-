@@ -15,7 +15,6 @@ from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
 
 ARQUIVO_SAIDA = "contas.json"
-API_VERSION = "v20"
 
 QUERY = """
     SELECT
@@ -32,7 +31,7 @@ QUERY = """
 
 
 def _client() -> GoogleAdsClient:
-    return GoogleAdsClient.load_from_storage("google-ads.yaml", version=API_VERSION)
+    return GoogleAdsClient.load_from_storage("google-ads.yaml")
 
 
 def descobrir(client: GoogleAdsClient, manager_id: str) -> list[dict]:

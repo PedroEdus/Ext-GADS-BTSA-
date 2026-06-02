@@ -36,7 +36,6 @@ TABLE_RAW    = f"{PROJECT_ID}.{DATASET_RAW}.google_ads_raw"
 TABLE_AUDIT  = f"{PROJECT_ID}.{DATASET_SILV}.controle_cargas_google_ads"
 
 ARQUIVO_CONTAS = "contas.json"
-API_VERSION = "v20"
 
 # Métricas diárias por campanha. Ajuste as colunas conforme a necessidade.
 GAQL = """
@@ -59,7 +58,7 @@ GAQL = """
 
 
 def _ads_client() -> GoogleAdsClient:
-    return GoogleAdsClient.load_from_storage("google-ads.yaml", version=API_VERSION)
+    return GoogleAdsClient.load_from_storage("google-ads.yaml")
 
 
 def _carregar_contas() -> list[dict]:

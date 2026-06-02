@@ -31,6 +31,7 @@ _CSS = """
 .pub-bar-row { display:grid; grid-template-columns:240px 1fr 130px; align-items:center; gap:12px; }
 .pub-bar-name { font-family:'Manrope',sans-serif; font-size:12px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pub-bar-track { height:16px; background:#262626; border-radius:3px; overflow:hidden; }
+.pub-bar-fill { height:100%; border-radius:3px; }
 .pub-bar-value { font-family:'JetBrains Mono',monospace; font-size:12px; color:rgba(255,255,255,0.72); text-align:right; font-variant-numeric:tabular-nums; }
 .pub-bar-legend { display:flex; gap:14px; margin-top:14px; padding-top:12px; border-top:1px solid #2a2a2a; flex-wrap:wrap; }
 .pub-legend-item { display:inline-flex; align-items:center; gap:6px; font-family:'Manrope',sans-serif; font-size:12px; color:rgba(255,255,255,0.72); }
@@ -417,7 +418,7 @@ def grafico_barras_campanha(df: pd.DataFrame, coluna: str, titulo: str, key: str
             f'<div class="pub-bar-row">'
             f'<div class="pub-bar-name" title="{camp}">{name_tr}</div>'
             f'<div class="pub-bar-track">'
-            f'<div style="width:{bar_w:.2f}%;height:100%;background:{color};border-radius:3px;"></div>'
+            f'<div class="pub-bar-fill" style="width:{bar_w:.2f}%;background:{color};"></div>'
             f'</div>'
             f'<div class="pub-bar-value">{fmt(val)}</div>'
             f'</div>'

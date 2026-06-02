@@ -277,7 +277,7 @@ _EVO_FMT = {
 
 _LAYOUT_BASE = dict(
     plot_bgcolor="#1c1c1c",
-    paper_bgcolor="rgba(0,0,0,0)",
+    paper_bgcolor="#1c1c1c",
     font=dict(family="Manrope, sans-serif", color="#ffffff"),
     margin=dict(l=20, r=20, t=50, b=20),
     xaxis=dict(title=None, gridcolor="#2a2a2a", linecolor="#2a2a2a"),
@@ -369,7 +369,7 @@ def grafico_tipo_lancamento(df: pd.DataFrame, coluna: str = "cost", titulo: str 
         domain=dict(x=[0, 0.62], y=[0, 1]),
     )
     fig.update_layout(
-        plot_bgcolor="#1c1c1c", paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#1c1c1c", paper_bgcolor="#1c1c1c",
         separators=",.", height=320,
         margin=dict(l=10, r=10, t=50, b=10),
         legend=dict(

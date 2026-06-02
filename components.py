@@ -467,6 +467,73 @@ def grafico_barras_campanha(df: pd.DataFrame, coluna: str, titulo: str, key: str
                 st.rerun()
 
 
+# ── Donut por canal (advertising_channel_type) ───────────────────────────────
+
+_CHANNEL_LABELS = {
+    "SEARCH":          "Pesquisa",
+    "PERFORMANCE_MAX": "Performance Max",
+    "DISPLAY":         "Display",
+    "SHOPPING":        "Shopping",
+    "VIDEO":           "Vídeo",
+    "SMART":           "Smart",
+}
+
+_CHANNEL_COLORS = {
+    "Pesquisa":         "#008140",
+    "Performance Max":  "#00b359",
+    "Display":          "#33aa77",
+    "Shopping":         "#66cc99",
+    "Vídeo":            "#004d26",
+    "Smart":            "#888888",
+}
+
+
+def grafico_canal(df: pd.DataFrame, coluna: str = "cost", titulo: str | None = None) -> None:
+    if "advertising_channel_type" not in df.columns or coluna not in df.columns:
+        return
+
+    label = {"cost": "Investimento (R$)", "clicks": "Cliques"}.get(coluna, coluna)
+    titulo = titulo or f"Distribuição por canal — {label}"
+    fmt = (lambda v: _br(v, 2, "R$ ")) if coluna == "cost" else (lambda v: _br(v))
+
+    df_plot = df.copy()
+    df_plot["canal"] = df_plot["advertising_channel_type"].map(
+        lambda x: _CHANNEL_LABELS.get(str(x), str(x))
+    )
+    resumo = df_plot.groupby("canal", as_index=False)[coluna].sum()
+    total  = resumo[coluna].sum()
+    resumo["_pct"]  = (resumo[coluna] / total * 100).round(1) if total else 0
+    resumo["_text"] = resumo.apply(
+        lambda r: f"{fmt(r[coluna])}<br>{r['_pct']:.1f}%" if r["_pct"] >= 4 else "", axis=1
+    )
+    font_colors = [
+        _font_color_para_fundo(_CHANNEL_COLORS.get(c, "#888888"))
+        for c in resumo["canal"]
+    ]
+
+    fig = px.pie(resumo, names="canal", values=coluna,
+                 color="canal", color_discrete_map=_CHANNEL_COLORS,
+                 hole=0.58, title=titulo)
+    fig.update_traces(
+        text=resumo["_text"].tolist(), textposition="inside", textinfo="text",
+        insidetextfont=dict(family="JetBrains Mono, monospace", size=11, color=font_colors),
+        hovertemplate="%{label}: %{value:,.0f} (%{percent})",
+        domain=dict(x=[0, 0.62], y=[0, 1]),
+    )
+    fig.update_layout(
+        plot_bgcolor="#1c1c1c", paper_bgcolor="#1c1c1c",
+        separators=",.", height=300,
+        margin=dict(l=10, r=10, t=50, b=10),
+        legend=dict(
+            orientation="v", x=0.65, y=0.5, xanchor="left", yanchor="middle",
+            font=dict(family="Manrope, sans-serif", size=12, color="rgba(255,255,255,0.8)"),
+        ),
+        font=dict(family="Manrope, sans-serif", color="#ffffff"),
+        title=_titulo_layout(titulo),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
 # ── Tabela resumo por conta (cidade) ──────────────────────────────────────────
 def tabela_resumo(df: pd.DataFrame) -> None:
     grupo = "customer_name" if "customer_name" in df.columns else "campaign_name"

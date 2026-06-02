@@ -95,4 +95,12 @@ with aba_cpc:
     grafico_barras_campanha(df, "cpc", "Custo por clique por campanha (R$)", "bar_cpc")
 
 with aba_tabela:
+    st.subheader("Detalhe por campanha")
+    csv = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+    st.download_button(
+        label="⬇️ Baixar dados (CSV)",
+        data=csv,
+        file_name="google_ads_filtrado.csv",
+        mime="text/csv",
+    )
     tabela_resumo(df)

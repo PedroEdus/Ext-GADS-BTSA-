@@ -15,3 +15,4 @@ gads_out/
 massiva.log
 massiva_agendada.log
 run_massiva.bat
+*.csv

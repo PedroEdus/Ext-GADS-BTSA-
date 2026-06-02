@@ -12,11 +12,17 @@ TABELA     = "google_ads"
 
 
 def _criar_client() -> bigquery.Client:
-    if "gcp_service_account" in st.secrets:
-        credentials = service_account.Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"]
-        )
-        return bigquery.Client(credentials=credentials, project=PROJECT_ID)
+    # Em produção (Streamlit Cloud) usa st.secrets; local cai no
+    # GOOGLE_APPLICATION_CREDENTIALS. Acessar st.secrets sem secrets.toml
+    # levanta StreamlitSecretNotFoundError, então protegemos com try/except.
+    try:
+        if "gcp_service_account" in st.secrets:
+            credentials = service_account.Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"]
+            )
+            return bigquery.Client(credentials=credentials, project=PROJECT_ID)
+    except Exception:
+        pass
     return bigquery.Client(project=PROJECT_ID)
 
 

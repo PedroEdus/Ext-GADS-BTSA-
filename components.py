@@ -22,8 +22,8 @@ _PALETTE = [
 ]
 
 _LANCAMENTO_COLOR_MAP = {
-    "Lançamento": _PALETTE[0],  # verde principal
-    "Estoque":    _PALETTE[3],  # azul-petróleo
+    "Lançamento": _PALETTE[3],  # verde principal
+    "Estoque":    _PALETTE[0],  # azul-petróleo
     "Outros":     _PALETTE[2],  # cinza
 }
 
